@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -268,6 +269,94 @@ func TestIsTrainJobStalled(t *testing.T) {
 			got := IsTrainJobStalled(tc.trainJob, now, tc.progressDeadline)
 			if got != tc.want {
 				t.Errorf("IsTrainJobStalled(%v, %v, %v) = %v, want %v", tc.trainJob, now, tc.progressDeadline, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFindStalledTrainJobs(t *testing.T) {
+	now := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	progressDeadline := 30 * time.Minute
+	recentUpdate := metav1.NewTime(now.Add(-5 * time.Minute))
+	staleUpdate := metav1.NewTime(now.Add(-2 * time.Hour))
+
+	progressingTrainJob := trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "progressing"},
+		Status: trainer.TrainJobStatus{
+			TrainerStatus: &trainer.TrainerStatus{
+				ProgressPercentage: ptr.To[int32](40),
+				LastUpdatedTime:    recentUpdate,
+				LastProgressTime:   recentUpdate,
+			},
+		},
+	}
+	stuckTrainJob := trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "stuck"},
+		Status: trainer.TrainJobStatus{
+			TrainerStatus: &trainer.TrainerStatus{
+				ProgressPercentage: ptr.To[int32](40),
+				LastUpdatedTime:    recentUpdate,
+				LastProgressTime:   staleUpdate,
+			},
+		},
+	}
+	unresponsiveTrainJob := trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "unresponsive"},
+		Status: trainer.TrainJobStatus{
+			TrainerStatus: &trainer.TrainerStatus{
+				ProgressPercentage: ptr.To[int32](40),
+				LastUpdatedTime:    staleUpdate,
+			},
+		},
+	}
+	completedTrainJob := trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "completed"},
+		Status: trainer.TrainJobStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   trainer.TrainJobComplete,
+					Status: metav1.ConditionTrue,
+				},
+			},
+			TrainerStatus: &trainer.TrainerStatus{
+				LastUpdatedTime: staleUpdate,
+			},
+		},
+	}
+
+	cases := map[string]struct {
+		trainJobs []trainer.TrainJob
+		want      []string
+	}{
+		// With no TrainJobs, no TrainJob is stalled.
+		"no TrainJobs": {
+			trainJobs: nil,
+			want:      nil,
+		},
+		// TrainJobs that are progressing or finished are not returned.
+		"no stalled TrainJobs": {
+			trainJobs: []trainer.TrainJob{progressingTrainJob, completedTrainJob},
+			want:      nil,
+		},
+		// Only the stuck and unresponsive TrainJobs are returned, in their original order.
+		"some stalled TrainJobs": {
+			trainJobs: []trainer.TrainJob{stuckTrainJob, progressingTrainJob, unresponsiveTrainJob, completedTrainJob},
+			want:      []string{"stuck", "unresponsive"},
+		},
+		// Every TrainJob is returned when all of them are stalled.
+		"all stalled TrainJobs": {
+			trainJobs: []trainer.TrainJob{unresponsiveTrainJob, stuckTrainJob},
+			want:      []string{"unresponsive", "stuck"},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			var got []string
+			for _, trainJob := range FindStalledTrainJobs(tc.trainJobs, now, progressDeadline) {
+				got = append(got, trainJob.Name)
+			}
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("Unexpected stalled TrainJobs (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -590,6 +590,11 @@ type TrainerStatus struct {
 	// lastUpdatedTime is the timestamp when the runtime status was observed.
 	// +optional
 	LastUpdatedTime metav1.Time `json:"lastUpdatedTime,omitempty"`
+
+	// lastProgressTime is the timestamp when progressPercentage last changed.
+	// The value will be empty if progressPercentage has not been reported.
+	// +optional
+	LastProgressTime metav1.Time `json:"lastProgressTime,omitempty"`
 }
 
 type Metric struct {
