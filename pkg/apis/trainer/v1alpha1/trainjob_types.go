@@ -81,6 +81,11 @@ const (
 	// when the TrainJob exceeds its ActiveDeadlineSeconds.
 	// Matches the Kubernetes Job behavior.
 	TrainJobDeadlineExceededReason string = "DeadlineExceeded"
+
+	// TrainJobProgressDeadlineExceededReason is the "Failed" condition reason
+	// when the TrainJob stops making progress within its progress deadline.
+	// Matches the Kubernetes Deployment behavior.
+	TrainJobProgressDeadlineExceededReason string = "ProgressDeadlineExceeded"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

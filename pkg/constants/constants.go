@@ -96,6 +96,11 @@ const (
 	// when the TrainJob exceeds its ActiveDeadlineSeconds.
 	TrainJobDeadlineExceededMessage = "TrainJob exceeded its active deadline"
 
+	// TrainJobProgressDeadlineExceededMessage is the status condition message for the
+	// {"type": "Failed", "reason": "ProgressDeadlineExceeded"} condition
+	// when the TrainJob stops making progress within its progress deadline.
+	TrainJobProgressDeadlineExceededMessage = "TrainJob stopped making progress within its progress deadline"
+
 	// Node is the name of the Job and container for the MPI launcher.
 	// When RunLauncherAsNode: true, for the launcher Job the container name is node.
 	Launcher string = "launcher"
